@@ -3,13 +3,5 @@
 local.properties
 build/
 build-local/
-build-tests/
 app/build/
 *.iml
-*.jks
-*.keystore
-*.p12
-*.pfx
-.env
-.env.*
-.DS_Store

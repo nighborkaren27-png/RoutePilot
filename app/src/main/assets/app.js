@@ -35,22 +35,26 @@ function jump(append){const a=$('lat').value.trim(),b=$('lng').value.trim();if(!
 function importPoints(p){if(active)return say('请先停止模拟');if(!Array.isArray(p)||p.length<2||p.length>10000||!p.every(valid))return say('路线无效：需要 2–10000 个有效坐标点');points=p;draw();if(map)map.fitBounds(L.latLngBounds(points),{padding:[25,25],maxZoom:18});persist();say(`已导入 ${p.length} 个路线点`);}
 function pastePoints(){const p=$('coords').value.trim().split(/\n+/).map(s=>s.trim().split(/[,，\s]+/).map(Number));importPoints(p);}
 function exportRoute(){if(points.length<2)return say('请先选择至少两个路线点');Native.exportGpx(JSON.stringify(points));}
-function begin(){
+function toggleMap(){const stage=$('mapStage');stage.classList.toggle('expanded');document.body.classList.toggle('mapOpen',stage.classList.contains('expanded'));$('mapExpand').textContent=stage.classList.contains('expanded')?'退出全屏':'全屏地图';if(map)setTimeout(()=>map.invalidateSize(),50);}
+function addMapCenter(){if(map){const p=map.getCenter();add([p.lat,((p.lng+180)%360+360)%360-180]);}}
+function mapCenterInfo(){if(map){const p=map.getCenter();$('mapCenter').textContent=`中心 ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)} · 缩放 ${map.getZoom()}`;}}
+function begin(hold=false){
   const c=config();if(points.length<2)return say('请先选择至少两个路线点');
   if(!$('speed').value.trim()||!Number.isFinite(c.speed)||c.speed<0.5||c.speed>30)return say('速度范围是 0.5–30 km/h');
   if(!$('target').value.trim()||!Number.isFinite(c.target)||c.target<0||c.target>100)return say('目标距离范围是 0–100 km');
-  persist();Native.begin(JSON.stringify({points:c.points,speed:c.speed,target:c.target,loop:c.loop,compatibility:c.compatibility}));
+  persist();Native.begin(JSON.stringify({points:c.points,speed:c.speed,target:c.target,loop:c.loop,compatibility:c.compatibility,hold:!!hold}));
 }
 function updateDiagnostics(s){
   if(!s.started)return;
-  const sample=x=>!x||!x.received?'尚未收到位置回调':`${x.count} 次回调 · 精度字段 ${Number(x.accuracy).toFixed(1)} m · 数据距今 ${Number(x.age).toFixed(1)} s · ${x.mock?'系统标记模拟':'系统未标记模拟'}`;
-  $('diagnosticNote').textContent=s.note;
+  const sample=x=>!x||!x.received?'尚未收到位置回调':`${x.count} 次回调 · 精度字段 ${x.hasAccuracy===false?'未知':Number(x.accuracy).toFixed(1)+' m'} · 数据距今 ${Number(x.age).toFixed(1)} s · ${x.mock?'系统标记模拟':'系统未标记模拟'}${x.cached?' · 自检前产生的缓存位置':''}`;
+  $('diagnosticNote').textContent=s.note+(s.active?'':'；检测已结束，以下为保留的最近结果，数据距今会继续增加。');
   $('diagnosticPermission').textContent=`精确定位权限：${s.permission?'已授予':'未授予'} · GPS 开关：${s.enabled?'开启':'关闭'} · 模拟位置应用：${s.selected?'已选本应用':'未选本应用'}`;
   $('diagnosticGps').textContent='GPS：'+sample(s.gps);$('diagnosticNetwork').textContent='网络定位：'+sample(s.network);
   $('diagnosticGnss').textContent=s.visible<0?'系统卫星状态：尚未收到系统回调，不能据此断言卫星数为 0':`系统卫星状态：可见 ${s.visible} 颗 · 用于定位 ${s.used} 颗（与兼容模式的附加数字无关）`;
 }
 function updateStatus(s){
   active=!!s.running;$('state').textContent=active?(s.paused?'已暂停':'运行中'):'待开始';$('message').textContent=s.message;
+  $('injection').textContent=active?`本程序已发送 ${s.updates||0} 组位置；第三方是否接收需单独验证。`:'';
   $('distance').innerHTML=(s.distance/1000).toFixed(2)+' <span class="unit">km</span>';
   const t=Math.floor(s.seconds);$('time').textContent=(Math.floor(t/60)).toString().padStart(2,'0')+':'+(t%60).toString().padStart(2,'0');
   $('start').disabled=active;$('pause').disabled=!active;$('stop').disabled=!active;$('pause').textContent=s.paused?'继续':'暂停';document.querySelectorAll('.edit').forEach(e=>e.disabled=active);
@@ -64,8 +68,9 @@ if(typeof saved.compatibility==='boolean')$('compatibility').checked=saved.compa
 if(['auto','hot','osm','tdt','tdtSat'].includes(saved.mapSource))$('mapSource').value=saved.mapSource;
 if(typeof saved.tdtKey==='string'&&saved.tdtKey.length<=128)$('tdtKey').value=saved.tdtKey;
 try{
-  map=L.map('map',{zoomControl:true}).setView(valid(saved.center)?saved.center:[31.2304,121.4737],Number.isFinite(saved.zoom)?Math.max(2,Math.min(19,saved.zoom)):16);
+  map=L.map('map',{zoomControl:true}).setView(valid(saved.center)?saved.center:[31.2304,121.4737],Number.isFinite(saved.zoom)?Math.max(2,Math.min(22,saved.zoom)):16);
+  L.control.scale({imperial:false}).addTo(map);
   baseMap=new RouteMaps.MapController(map,L,text=>$('mapError').textContent=text);changeMap();
-  map.on('click',e=>add([e.latlng.lat,((e.latlng.lng+180)%360+360)%360-180]));map.on('moveend',persist);
+  map.on('click',e=>add([e.latlng.lat,((e.latlng.lng+180)%360+360)%360-180]));map.on('moveend',()=>{mapCenterInfo();persist();});mapCenterInfo();
 }catch(e){$('mapError').textContent='地图不可用，请通过坐标或 GPX 设置路线。';}
 draw();

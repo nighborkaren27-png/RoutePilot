@@ -5,11 +5,11 @@
   const validKey=key=>/^[A-Za-z0-9_.-]{8,128}$/.test(key);
   function definitions(id,key){
     const osmCredit='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>';
-    if(id==='osm')return [{url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',options:{maxZoom:19,attribution:osmCredit}}];
-    if(id==='hot')return [{url:'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',options:{maxZoom:19,subdomains:'abc',attribution:osmCredit+' | Style: HOT | Tiles: <a href="https://www.openstreetmap.fr/usage/">OSM France</a>'}}];
+    if(id==='osm')return [{url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',options:{maxZoom:22,maxNativeZoom:19,attribution:osmCredit}}];
+    if(id==='hot')return [{url:'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',options:{maxZoom:22,maxNativeZoom:19,subdomains:'abc',attribution:osmCredit+' | Style: HOT | Tiles: <a href="https://www.openstreetmap.fr/usage/">OSM France</a>'}}];
     if((id==='tdt'||id==='tdtSat')&&validKey(key)){
       const kinds=id==='tdt'?['vec','cva']:['img','cia'];
-      return kinds.map((kind,i)=>({url:'https://t{s}.tianditu.gov.cn/'+kind+'_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER='+kind+'&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk='+encodeURIComponent(key),options:{maxZoom:18,minZoom:1,subdomains:'01234567',attribution:i===0?'© <a href="https://www.tianditu.gov.cn/">天地图</a>':'',pane:i===0?'tilePane':'mapLabels'}}));
+      return kinds.map((kind,i)=>({url:'https://t{s}.tianditu.gov.cn/'+kind+'_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER='+kind+'&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk='+encodeURIComponent(key),options:{maxZoom:22,maxNativeZoom:18,minZoom:1,subdomains:'01234567',attribution:i===0?'© <a href="https://www.tianditu.gov.cn/">天地图</a>':'',pane:i===0?'tilePane':'mapLabels'}}));
     }
     return [];
   }

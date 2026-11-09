@@ -14,6 +14,7 @@ final class LocationDiagnostics {
     private final LocationManager manager;
     private final Handler handler;
     private Location gps,network;
+    private long sessionStartNanos;
     private int gpsCount,networkCount,visible=-1,used=-1;
     private boolean active=false,started=false;
     private String note="尚未自检";
@@ -30,7 +31,7 @@ final class LocationDiagnostics {
     LocationDiagnostics(Context context,Handler handler){this.context=context;this.handler=handler;manager=(LocationManager)context.getSystemService(Context.LOCATION_SERVICE);}
     boolean permitted(){return context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED;}
     void start(){
-        stop("准备自检");gps=null;network=null;gpsCount=0;networkCount=0;visible=-1;used=-1;started=true;
+        stop("准备自检");gps=null;network=null;gpsCount=0;networkCount=0;visible=-1;used=-1;started=true;sessionStartNanos=SystemClock.elapsedRealtimeNanos();
         if(!permitted()){note="请授予精确定位权限后重试";return;}
         active=true;note="正在监听系统定位回调（30 秒），请保持此页面可见";
         try{
@@ -48,7 +49,7 @@ final class LocationDiagnostics {
     }
     private JSONObject sample(Location l,int count)throws JSONException{
         JSONObject o=new JSONObject();o.put("count",count).put("received",l!=null);
-        if(l!=null){o.put("accuracy",l.getAccuracy()).put("age",Math.max(0,(SystemClock.elapsedRealtimeNanos()-l.getElapsedRealtimeNanos())/1e9)).put("mock",l.isFromMockProvider());}
+        if(l!=null){o.put("hasAccuracy",l.hasAccuracy()).put("cached",l.getElapsedRealtimeNanos()<sessionStartNanos).put("accuracy",l.getAccuracy()).put("age",Math.max(0,(SystemClock.elapsedRealtimeNanos()-l.getElapsedRealtimeNanos())/1e9)).put("mock",l.isFromMockProvider());}
         return o;
     }
     JSONObject status(){

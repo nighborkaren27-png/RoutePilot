@@ -13,6 +13,7 @@ import java.util.*;
 public class RouteService extends Service {
     public static volatile boolean running=false,paused=false;
     public static volatile double traveled=0,seconds=0,lat=0,lng=0;
+    public static volatile long sentUpdates=0;
     public static volatile String message="尚未开始";
     private final Handler handler=new Handler(Looper.getMainLooper());
     private LocationManager manager;
@@ -25,7 +26,7 @@ public class RouteService extends Service {
     private int ticks=0;
     public static JSONObject status(){
         JSONObject o=new JSONObject();
-        try{o.put("running",running).put("paused",paused).put("distance",traveled).put("seconds",seconds).put("lat",lat).put("lng",lng).put("message",message);}catch(JSONException ignored){}
+        try{o.put("running",running).put("paused",paused).put("distance",traveled).put("seconds",seconds).put("lat",lat).put("lng",lng).put("message",message).put("updates",sentUpdates);}catch(JSONException ignored){}
         return o;
     }
     @Override public void onCreate(){super.onCreate();manager=(LocationManager)getSystemService(LOCATION_SERVICE);getSystemService(NotificationManager.class).createNotificationChannel(new NotificationChannel("route","路线模拟运行",NotificationManager.IMPORTANCE_LOW));}
@@ -53,7 +54,8 @@ public class RouteService extends Service {
                 manager.addTestProvider(name,!gps,gps,!gps,!gps,true,true,true,gps?Criteria.POWER_HIGH:Criteria.POWER_LOW,gps?Criteria.ACCURACY_FINE:Criteria.ACCURACY_COARSE);
                 providers.add(name);manager.setTestProviderEnabled(name,true);
             }
-            traveled=0;seconds=0;paused=false;running=true;message=compatibility?"正在模拟路线 · 卫星位置兼容":"正在模拟路线 · 标准模式";
+            traveled=0;seconds=0;sentUpdates=0;paused=config.optBoolean("hold",false);running=true;message=compatibility?"正在模拟路线 · 卫星位置兼容":"正在模拟路线 · 标准模式";
+            if(paused)message="预定位中：保持路线起点，准备好后点击继续开始移动";
             ticks=0;
             wake=((PowerManager)getSystemService(POWER_SERVICE)).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"RoutePilot:route");wake.acquire();
             last=SystemClock.elapsedRealtime();handler.post(tick);
@@ -77,6 +79,7 @@ public class RouteService extends Service {
                 if(compatibility&&gps){Bundle extras=new Bundle();extras.putInt("satellites",7);l.setExtras(extras);}
                 manager.setTestProviderLocation(provider,l);
             }
+            sentUpdates++;
             if(done){message="已完成，已释放模拟定位";stopSelf();return;}
             if(ticks++%(compatibility?50:5)==0)getSystemService(NotificationManager.class).notify(1,notification());
             handler.postDelayed(this,compatibility?100:1000);

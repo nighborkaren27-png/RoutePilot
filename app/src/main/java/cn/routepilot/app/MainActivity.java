@@ -25,17 +25,18 @@ public class MainActivity extends Activity {
     private LocationManager lm;
     private LocationDiagnostics diagnostics;
     private volatile boolean admitted=false;
+    private volatile boolean noticeBottomReached=false;
     private final Runnable refresh=new Runnable(){ public void run(){ if(web!=null){web.evaluateJavascript("window.updateStatus && updateStatus("+RouteService.status()+")",null);if(diagnostics!=null)web.evaluateJavascript("window.updateDiagnostics && updateDiagnostics("+diagnostics.status()+")",null);}handler.postDelayed(this,1000); }};
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
     @Override public void onCreate(Bundle state){
         super.onCreate(state);lm=(LocationManager)getSystemService(LOCATION_SERVICE);diagnostics=new LocationDiagnostics(this,handler);
-        admitted=state!=null&&state.getInt("noticeVersion",0)==4&&state.getBoolean("noticeAccepted",false);
+        admitted=getPreferences(0).getBoolean("noticeAcceptedOnce",false);
         FrameLayout root=new FrameLayout(this);root.setBackgroundColor(Color.rgb(11,37,36));
         web=new WebView(this);root.addView(web);setContentView(root);
         if(Build.VERSION.SDK_INT>=30)root.setOnApplyWindowInsetsListener((v,insets)->{android.graphics.Insets b=insets.getInsets(android.view.WindowInsets.Type.systemBars()|android.view.WindowInsets.Type.displayCutout()|android.view.WindowInsets.Type.ime());v.setPadding(b.left,b.top,b.right,b.bottom);return insets;});
         else root.setFitsSystemWindows(true);
         web.getSettings().setJavaScriptEnabled(true);web.getSettings().setDomStorageEnabled(true);
-        web.getSettings().setUserAgentString(web.getSettings().getUserAgentString()+" RoutePilot/1.3");
+        web.getSettings().setUserAgentString(web.getSettings().getUserAgentString()+" RoutePilot/1.4");
         web.getSettings().setAllowFileAccess(false);web.getSettings().setAllowContentAccess(false);
         web.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         web.addJavascriptInterface(new Bridge(),"Native");
@@ -72,7 +73,16 @@ public class MainActivity extends Activity {
         if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},11);
         try{startForegroundService(new Intent(this,RouteService.class).setAction("start").putExtra("config",config));}catch(Exception e){toast("无法启动："+e.getMessage());}
     }
-    private void openDevelopers(){try{startActivity(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));}catch(Exception e){startActivity(new Intent(Settings.ACTION_SETTINGS));}}
+    private boolean launchSettings(Intent... intents){for(Intent i:intents)try{startActivity(i);return true;}catch(ActivityNotFoundException|SecurityException ignored){}toast("系统未提供可打开的设置页面，请手动打开手机设置");return false;}
+    private void openDevelopers(){
+        Intent primary=new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS);
+        try{startActivity(primary);return;}catch(ActivityNotFoundException|SecurityException ignored){}
+        Intent dashboard=new Intent().setComponent(new ComponentName("com.android.settings","com.android.settings.Settings$DevelopmentSettingsDashboardActivity"));
+        Intent legacy=new Intent().setComponent(new ComponentName("com.android.settings","com.android.settings.DevelopmentSettings"));
+        toast("若未开启开发者选项，请在关于手机中连续点击版本号，再搜索开发者选项");
+        launchSettings(dashboard,legacy,new Intent(Settings.ACTION_DEVICE_INFO_SETTINGS),new Intent(Settings.ACTION_SETTINGS));
+    }
+    private void openAppSettings(){launchSettings(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())),new Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS),new Intent(Settings.ACTION_SETTINGS));}
     private void locate(){
         if(RouteService.running){toast("请先停止模拟，再获取真实位置");return;}
         if(!permission()){askLocation();return;}
@@ -92,7 +102,8 @@ public class MainActivity extends Activity {
     }
     public class Bridge {
         @JavascriptInterface public String noticeStatus(){return "{\"admitted\":"+admitted+",\"running\":"+RouteService.running+"}";}
-        @JavascriptInterface public void enterApp(boolean accepted){runOnUiThread(()->{if(!admitted&&!accepted){toast("请先勾选已阅读并理解");return;}admitted=true;web.loadUrl("https://route.local/index.html");});}
+        @JavascriptInterface public void noticeReachedEnd(){noticeBottomReached=true;}
+        @JavascriptInterface public void enterApp(boolean accepted){runOnUiThread(()->{if(!admitted&&(!accepted||!noticeBottomReached)){toast("请先将免责声明滑到最底部，再勾选确认");return;}getPreferences(0).edit().putBoolean("noticeAcceptedOnce",true).apply();admitted=true;web.loadUrl("https://route.local/index.html");});}
         @JavascriptInterface public void closeIntro(){runOnUiThread(()->{if(admitted)web.loadUrl("https://route.local/index.html");else{if(RouteService.running){RouteService.message="已停止，已释放模拟定位";stopService(new Intent(MainActivity.this,RouteService.class));}finish();}});}
         @JavascriptInterface public void showGuide(){runOnUiThread(()->{diagnostics.stop("查看说明，自检已停止");web.loadUrl("https://route.local/startup.html#guide");});}
         @JavascriptInterface public void diagnose(){runOnUiThread(()->{if(!permission()){askLocation();toast("请允许精确定位后，再点击定位自检");return;}diagnostics.start();});}
@@ -103,7 +114,7 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void stop(){runOnUiThread(()->{if(RouteService.running)startService(new Intent(MainActivity.this,RouteService.class).setAction("stop"));});}
         @JavascriptInterface public void settings(){runOnUiThread(()->openDevelopers());}
         @JavascriptInterface public void mapHelp(){runOnUiThread(()->{try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://console.tianditu.gov.cn/api/key")));}catch(Exception e){toast("请在浏览器打开天地图开发者控制台申请地图服务 Key");}});}
-        @JavascriptInterface public void battery(){runOnUiThread(()->startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName()))));}
+        @JavascriptInterface public void battery(){runOnUiThread(()->openAppSettings());}
         @JavascriptInterface public void locate(){runOnUiThread(()->MainActivity.this.locate());}
         @JavascriptInterface public void importGpx(){runOnUiThread(()->{if(!RouteService.running)startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE),20);});}
         @JavascriptInterface public void exportGpx(String json){runOnUiThread(()->{pendingExport=json;startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/gpx+xml").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE,"route.gpx"),21);});}

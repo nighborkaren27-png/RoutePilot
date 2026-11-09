@@ -19,10 +19,10 @@ function fixture(){
 }
 {
  const f=fixture(),c=f.controller;c.apply('tdt','');assert.equal(f.map.layers.size,0);assert.match(f.messages.at(-1),/需要有效 Key/);
- const key='0123456789abcdef0123456789abcdef';c.apply('auto',key);assert.equal(c.current,'tdt');assert.equal(c.layers.length,2);assert.equal(f.map.maxZoom,18);
+ const key='0123456789abcdef0123456789abcdef';c.apply('auto',key);assert.equal(c.current,'tdt');assert.equal(c.layers.length,2);assert.equal(f.map.maxZoom,22);assert.equal(c.layers[0].options.maxNativeZoom,18);
  assert(c.layers[0].url.includes('/vec_w/wmts?'));assert(c.layers[1].url.includes('/cva_w/wmts?'));assert(c.layers[0].url.includes('tk='+key));assert(!f.messages.join().includes(key));
  c.apply('tdtSat',key);assert(c.layers[0].url.includes('/img_w/wmts?'));assert(c.layers[1].url.includes('/cia_w/wmts?'));assert.equal(f.map.layers.size,2);
- c.apply('hot','');assert.equal(f.map.layers.size,1);assert.equal(f.map.maxZoom,19);
+ c.apply('hot','');assert.equal(f.map.layers.size,1);assert.equal(f.map.maxZoom,22);
  c.apply('invalid','');assert.equal(f.map.layers.size,0);assert.equal(f.pending.size,0);
 }
 {

@@ -24,7 +24,7 @@ src=root/'app/src/main'
 manifest=work/'AndroidManifest.xml'
 manifest.write_text((src/'AndroidManifest.xml').read_text(encoding='utf-8').replace('<manifest ', '<manifest package="cn.routepilot.app" ',1),encoding='utf-8')
 run(tools/('aapt2'+ext),'compile','--dir',src/'res','-o',work/'res.zip')
-run(tools/('aapt2'+ext),'link','-o',work/'base.apk','-I',android,'--manifest',manifest,'--java',gen,'--min-sdk-version','26','--target-sdk-version','36','--version-code','4','--version-name','1.3.0','-A',src/'assets',work/'res.zip')
+run(tools/('aapt2'+ext),'link','-o',work/'base.apk','-I',android,'--manifest',manifest,'--java',gen,'--min-sdk-version','26','--target-sdk-version','36','--version-code','5','--version-name','1.4.0','-A',src/'assets',work/'res.zip')
 sources=list((src/'java').rglob('*.java'))+list(gen.rglob('*.java'))
 boot=str(tools/'core-lambda-stubs.jar')+os.pathsep+str(android)
 run(java('javac'),'-J-Duser.language=en','-encoding','UTF-8','-source','8','-target','8','-Xlint:-options','-bootclasspath',boot,'-d',classes,*sources)
@@ -38,7 +38,7 @@ run(tools/('zipalign'+ext),'-f','-p','4',work/'unsigned.apk',work/'aligned.apk')
 key=work/'development.p12'
 if not key.exists():run(java('keytool'),'-genkeypair','-keystore',key,'-storepass','android','-keypass','android','-alias','routepilot','-keyalg','RSA','-keysize','2048','-validity','3650','-dname','CN=RoutePilot Development, O=Local, C=CN')
 signer=tools/'lib/apksigner.jar'
-apk=root.parent/'RoutePilot-1.3.0.apk'
+apk=root.parent/'RoutePilot-1.4.0.apk'
 run(java('java'),'-jar',signer,'sign','--ks',key,'--ks-key-alias','routepilot','--ks-pass','pass:android','--key-pass','pass:android','--out',apk,work/'aligned.apk')
 run(java('java'),'-jar',signer,'verify','--verbose','--print-certs',apk)
 print('APK:',apk)
